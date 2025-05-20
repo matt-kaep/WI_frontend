@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 // Base URL pour l'API backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://wi-backend.onrender.com';
+const API_BASE_URL = 'https://wi-backend.onrender.com';
 
 // Client API pour les requêtes au backend
 const apiClient = {
