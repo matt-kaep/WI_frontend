@@ -17,7 +17,7 @@ export default defineConfig({
     // Configuration du proxy pour rediriger les requêtes API vers le backend
     proxy: {
       '/api': {
-        //target: 'http://localhost:8000', // Remplacez par l'URL correcte de votre backend
+        //target: 'http://localhost:8000', // Remplacez par l'URL correcte de votre backend #
         target: 'https://wi-backend.onrender.com', // Remplacez par l'URL correcte de votre backend
         changeOrigin: true,
         secure: false,
