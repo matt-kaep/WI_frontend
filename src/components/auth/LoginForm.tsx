@@ -50,7 +50,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         setOtpSent(true);
       } else {
         // Mode connexion standard
-        const { error, data } = await signInWithPassword(email, password);
+        const { error } = await signInWithPassword(email, password);
         
         if (error) {
           throw new Error(error.message);
