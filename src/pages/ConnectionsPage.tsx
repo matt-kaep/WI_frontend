@@ -342,9 +342,6 @@ const ConnectionsPage: React.FC = () => {
   
   // Charger les connexions uniquement au premier chargement ou lors d'un changement de session (sans recharger lors des mises à jour de selectedProfiles)
   useEffect(() => {
-    // Utilisation d'une clé pour suivre si la session a réellement changé
-    const sessionId = currentSession?.id;
-    
     // Fonction pour initialiser les données
     const initializeSessionData = async () => {
       // Vérifier que currentSession existe

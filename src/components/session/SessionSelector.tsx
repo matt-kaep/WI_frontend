@@ -9,7 +9,7 @@ interface SessionSelectorProps {
 }
 
 const SessionSelector: React.FC<SessionSelectorProps> = ({ onClose, className = '' }) => {
-  const { sessions, currentSession, setCurrentSession, isLoadingSessions, createSession, deleteSession, fetchSessions } = useSession();
+  const { sessions, setCurrentSession, isLoadingSessions, createSession, deleteSession, fetchSessions } = useSession();
   
   // État pour le modal de création de session
   const [isCreatingSession, setIsCreatingSession] = useState(false);
