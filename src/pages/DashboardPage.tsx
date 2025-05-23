@@ -14,7 +14,6 @@ interface SessionStats {
 interface SessionStatus {
   status: 'idle' | 'uploading' | 'processing' | 'done' | 'failed';
   message?: string;
-  progress?: number;
 }
 
 const DashboardPage: React.FC = () => {
@@ -45,12 +44,34 @@ const DashboardPage: React.FC = () => {
     if (!currentSession) return;
     
     try {
+      console.log("Récupération du statut de la session:", currentSession.id);
       const statusData = await apiClient.getSessionStatus(currentSession.id);
-      setStatus(statusData);
+      console.log("Statut récupéré:", statusData);
       
-      // Continuer à vérifier le statut si le traitement est en cours
-      if (statusData.status === 'uploading' || statusData.status === 'processing') {
-        setTimeout(fetchSessionStatus, 3000); // Vérifier toutes les 3 secondes
+      // S'assurer que nous avons bien un statut valide
+      if (statusData && typeof statusData.status === 'string') {
+        // Ne conserver que les champs status et message, ignorer progress
+        setStatus({
+          status: statusData.status,
+          message: statusData.message
+        });
+        
+        // Continuer à vérifier le statut si le traitement est en cours
+        if (statusData.status === 'uploading' || statusData.status === 'processing') {
+          console.log(`Statut en cours (${statusData.status}), nouvelle vérification dans 3 secondes`);
+          // Utilisation de setTimeout dans une variable pour suivre les appels
+          const timeoutId = setTimeout(() => {
+            console.log("Rappel de fetchSessionStatus par setTimeout");
+            fetchSessionStatus();
+          }, 3000);
+          
+          // Pour débogage : on peut nettoyer ce timeout si nécessaire
+          return () => clearTimeout(timeoutId);
+        } else {
+          console.log(`Statut final atteint: ${statusData.status}, arrêt des vérifications`);
+        }
+      } else {
+        console.error("Format de statut invalide reçu:", statusData);
       }
     } catch (error) {
       console.error('Erreur lors de la récupération du statut:', error);
@@ -95,7 +116,11 @@ const DashboardPage: React.FC = () => {
 
   // Fonction pour uploader le fichier
   const handleUpload = async () => {
-    if (!file || !currentSession) return;
+    console.log("Début de handleUpload");
+    if (!file || !currentSession) {
+      console.log("Abandon de l'upload: pas de fichier ou de session");
+      return;
+    }
 
     // Validation de l'URL LinkedIn
     if (!linkedinUrl) {
@@ -108,12 +133,20 @@ const DashboardPage: React.FC = () => {
       return;
     }
 
+    // Réinitialisation explicite du statut
     setIsUploading(true);
     setUploadError(null);
+    // Forcer le statut à "uploading" pour que l'interface reflète correctement l'état
+    setStatus({
+      status: 'uploading',
+      message: 'Uploading your connections file...'
+    });
 
     try {
+      console.log("Début de l'upload du fichier");
       // Upload du fichier et récupération des résultats avec l'URL LinkedIn
       const uploadResult = await apiClient.uploadConnectionsFile(file, currentSession.id, linkedinUrl);
+      console.log("Upload réussi, résultat:", uploadResult);
       
       // Mettre à jour les statistiques et le statut
       setStats({
@@ -125,6 +158,7 @@ const DashboardPage: React.FC = () => {
       });
       
       // Lancer la vérification du statut
+      console.log("Lancement de la vérification du statut");
       fetchSessionStatus();
       
       // Réinitialiser le fichier
@@ -133,9 +167,16 @@ const DashboardPage: React.FC = () => {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
+      console.error('Erreur détaillée lors de l\'upload:', error);
       setUploadError(`Erreur lors de l'upload: ${error.message}`);
-      console.error('Erreur lors de l\'upload:', error);
+      
+      // En cas d'erreur, mettre également à jour le statut
+      setStatus({
+        status: 'failed',
+        message: `Erreur: ${error.message}`,
+      });
     } finally {
+      console.log("Fin de la fonction handleUpload, réinitialisation de isUploading");
       setIsUploading(false);
     }
   };
@@ -299,15 +340,6 @@ const DashboardPage: React.FC = () => {
                 </div>
                 <span className="text-sm">{status.message || ''}</span>
               </div>
-              
-              {(status.status === 'uploading' || status.status === 'processing') && status.progress !== undefined && (
-                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                  <div 
-                    className="bg-blue-600 h-2.5 rounded-full" 
-                    style={{ width: `${status.progress}%` }}
-                  ></div>
-                </div>
-              )}
             </div>
           )}
           
