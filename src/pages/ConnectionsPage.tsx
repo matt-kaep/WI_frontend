@@ -811,12 +811,14 @@ const ConnectionsPage: React.FC = () => {
                                   className="ml-2 focus:outline-none" 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toggleFavorite(connection.id);
+                                    if (connection.id !== undefined && connection.id !== null) {
+                                      toggleFavorite(connection.id);
+                                    }
                                   }}
                                   aria-label={connection.is_favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                                  disabled={isTogglingFavorite === connection.id.toString()}
+                                  disabled={connection.id != null && isTogglingFavorite === connection.id.toString()}
                                 >
-                                  {isTogglingFavorite === connection.id.toString() ? (
+                                  {connection.id != null && isTogglingFavorite === connection.id.toString() ? (
                                     <svg className="h-4 w-4 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -902,11 +904,15 @@ const ConnectionsPage: React.FC = () => {
                     </h3>
                     <button 
                       className="focus:outline-none" 
-                      onClick={() => toggleFavorite(selectedConnection.id)}
+                      onClick={() => {
+                        if (selectedConnection.id !== undefined && selectedConnection.id !== null) {
+                          toggleFavorite(selectedConnection.id);
+                        }
+                      }}
                       aria-label={selectedConnection.is_favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                      disabled={isTogglingFavorite === selectedConnection.id.toString()}
+                      disabled={selectedConnection.id != null && isTogglingFavorite === selectedConnection.id.toString()}
                     >
-                      {isTogglingFavorite === selectedConnection.id.toString() ? (
+                      {selectedConnection.id != null && isTogglingFavorite === selectedConnection.id.toString() ? (
                         <svg className="h-6 w-6 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
