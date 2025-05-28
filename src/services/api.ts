@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 
 // Base URL pour l'API backend
-//const API_BASE_URL = 'https://wi-backend.onrender.com';
-const API_BASE_URL = 'http://0.0.0.0:8000';
+const API_BASE_URL = 'https://wi-backend.onrender.com';
+//const API_BASE_URL = 'http://0.0.0.0:8000';
 // Client API pour les requêtes au backend
 const apiClient = {
   // Sessions
