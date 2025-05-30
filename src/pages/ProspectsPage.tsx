@@ -78,6 +78,61 @@ interface Prospect {
 // Import ConnectionProfileCard styles
 import './ConnectionProfileCard.css';
 
+// Composant Toast
+const Toast = ({ message, onClose, type = "info", showSpinner = false }: { 
+  message: string, 
+  onClose: () => void, 
+  type?: "info" | "warning" | "success" | "error", 
+  showSpinner?: boolean 
+}) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgClass = {
+    info: "bg-blue-50 border-blue-400 text-blue-700",
+    warning: "bg-yellow-50 border-yellow-400 text-yellow-700",
+    success: "bg-green-50 border-green-400 text-green-700",
+    error: "bg-red-50 border-red-400 text-red-700",
+  }[type];
+
+  const iconClass = {
+    info: "text-blue-400",
+    warning: "text-yellow-400",
+    success: "text-green-400",
+    error: "text-red-400",
+  }[type];
+  
+  return (
+    <div className="fixed bottom-5 right-5 z-50 max-w-md w-full shadow-lg rounded-lg">
+      <div className={`p-4 border-l-4 ${bgClass} flex justify-between items-start`}>
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            {showSpinner ? (
+              <div className={`animate-spin rounded-full h-5 w-5 border-t-2 border-current ${iconClass}`}></div>
+            ) : (
+              <svg className={`h-5 w-5 ${iconClass}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            )}
+          </div>
+          <div className="ml-3">
+            <p className="text-sm">{message}</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="flex-shrink-0 ml-4">
+          <svg className={`h-5 w-5 ${iconClass}`} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- ConnectionProfileCard Component (Updated) ---
 // Define the props for the ConnectionProfileCard component
 interface ConnectionProfileCardProps {
@@ -292,18 +347,76 @@ const ProspectsPage: React.FC = () => {
   const [isLoadingProspectDetails, setIsLoadingProspectDetails] = useState<boolean>(false);
   const [prospectProfileData, setProspectProfileData] = useState<ProfileResume | null>(null);
   
+  // Nouveaux états pour la vue et l'export
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  
   // Filter state
   const [filters, setFilters] = useState<ProspectFilter>({
     selectedConnectionIds: [],
     locationFilter: "France OR Paris",
     jobTitleFilter: "Sales OR Marketing",
     useExperience: true,
-    useEducation: true,
-    limit: 50,
+    useEducation: false,
+    limit: 150,
   });
   
   // Show filter form (open by default)
   const [showFilters, setShowFilters] = useState(true);
+
+  // Toast state for notifications
+  const [toast, setToast] = useState<{ message: string, type: "info" | "warning" | "success" | "error" } | null>(null);
+
+  // Fonction pour exporter les prospects en CSV
+  const exportToCSV = () => {
+    if (prospects.length === 0) {
+      alert('Aucun prospect à exporter');
+      return;
+    }
+
+    const headers = [
+      'Nom',
+      'Poste',
+      'Localisation',
+      'Score de similarité (%)',
+      'Nombre d\'entreprises partagées',
+      'Nombre d\'écoles partagées',
+      'Entreprises partagées',
+      'Écoles partagées',
+      'URL LinkedIn',
+      'Connection via (ID)'
+    ];
+
+    const csvData = prospects.map(prospect => [
+      prospect.name || '',
+      prospect.title || '',
+      prospect.location || '',
+      Math.round((prospect.overall_similarity || 0) * 100),
+      prospect.nbr_shared_companies || 0,
+      prospect.nbr_shared_schools || 0,
+      prospect.shared_companies?.map(company => 
+        typeof company === 'string' ? company : company.name
+      ).join('; ') || '',
+      prospect.shared_schools?.map(school => 
+        typeof school === 'string' ? school : school.name
+      ).join('; ') || '',
+      prospect.profile_url || '',
+      prospect.focus_profile_id || ''
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `prospects_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Group prospects by connection profile (focus_profile_id) and sort by overall_similarity
   const prospectsByConnection = React.useMemo(() => {
@@ -429,6 +542,12 @@ const ProspectsPage: React.FC = () => {
     setLoadingParentProfiles({}); // Clear parent profile loading states
     setParentProfileErrors({}); // Clear parent profile errors
     
+    // Show loading toast with estimated time
+    setToast({ 
+      message: "Recherche en cours... Cette opération peut prendre 2 à 3 minutes", 
+      type: "info" 
+    });
+    
     try {
       console.log('Calling findProspects with filters:', filters);
       const initialProspects = await apiClient.findProspects(filters);
@@ -466,6 +585,7 @@ const ProspectsPage: React.FC = () => {
       setError(error.message || 'An error occurred during prospect search.');
     } finally {
       setIsLoading(false);
+      setToast(null);
     }
   };
 
@@ -757,7 +877,18 @@ const ProspectsPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {selectedProspect && <ProspectDetailDialog />}
-      <h1 className="text-2xl font-bold mb-6">Prospects</h1>
+      
+      {/* Toast notifications */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)}
+          showSpinner={toast.type === "info" && isLoading}
+        />
+      )}
+      
+      <h1 className="text-2xl font-bold mb-6">🔎 Prospects Search</h1>
       
       {/* Selected profiles information */}
       <div className="mb-6 bg-white p-4 shadow rounded-lg">
@@ -964,189 +1095,390 @@ const ProspectsPage: React.FC = () => {
       {!isLoading && prospects.length > 0 && (
         <div className="bg-white shadow sm:rounded-lg">
           <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Identified Prospects
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              {prospects.length} prospects with high connection potential
-            </p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  Identified Prospects
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                  {prospects.length} prospects with high connection potential
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                {/* View mode toggle */}
+                <div className="flex rounded-md shadow-sm">
+                  <button
+                    onClick={() => setViewMode('cards')}
+                    className={`px-4 py-2 text-sm font-medium rounded-l-md border ${
+                      viewMode === 'cards'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    Cartes
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-4 py-2 text-sm font-medium rounded-r-md border-l-0 border ${
+                      viewMode === 'list'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    Liste
+                  </button>
+                </div>
+                
+                {/* Export button */}
+                <button
+                  onClick={exportToCSV}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Exporter CSV
+                </button>
+              </div>
+            </div>
           </div>
           <div className="p-4">
-            {Object.entries(prospectsByConnection).map(([focusProfileId, prospectsInGroup], index) => {
-              const parentProfileData = parentProfileResumes[focusProfileId];
-              const isParentLoading = loadingParentProfiles[focusProfileId];
-              const parentError = parentProfileErrors[focusProfileId];
+            {viewMode === 'cards' ? (
+              // Vue en cartes (existante)
+              Object.entries(prospectsByConnection).map(([focusProfileId, prospectsInGroup], index) => {
+                const parentProfileData = parentProfileResumes[focusProfileId];
+                const isParentLoading = loadingParentProfiles[focusProfileId];
+                const parentError = parentProfileErrors[focusProfileId];
 
-              return (
-                <div key={`parent-group-${focusProfileId}`} className="mb-8">
-                  <div className="mb-4 border-b border-gray-200 pb-2">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold mr-3">
-                        {index + 1}
+                return (
+                  <div key={`parent-group-${focusProfileId}`} className="mb-8">
+                    <div className="mb-4 border-b border-gray-200 pb-2">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold mr-3">
+                          {index + 1}
+                        </div>
+                        <h3 className="text-md font-medium text-gray-800">
+                          Via connection:
+                          <span className="ml-2 text-sm font-normal text-gray-500">({prospectsInGroup.length} prospects)</span>
+                        </h3>
                       </div>
-                      <h3 className="text-md font-medium text-gray-800">
-                        Via connection:
-                        <span className="ml-2 text-sm font-normal text-gray-500">({prospectsInGroup.length} prospects)</span>
-                      </h3>
+                      
+                      {/* Display ConnectionProfileCard for the parent connection */}
+                      {focusProfileId !== 'unknown' ? (
+                        <div className="mt-3 w-full">
+                          <div className="w-full">
+                            <ConnectionProfileCard 
+                              connectionId={focusProfileId} 
+                              profileData={parentProfileData || null} 
+                              isLoading={isParentLoading}
+                              error={parentError}
+                              prospectCount={prospectsInGroup.length}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3 py-2 px-4 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-500">Unknown connection source or data not available</p>
+                        </div>
+                      )}
                     </div>
                     
-                    {/* Display ConnectionProfileCard for the parent connection */}
-                    {focusProfileId !== 'unknown' ? (
-                      <div className="mt-3 w-full">
-                        <div className="w-full">
-                          <ConnectionProfileCard 
-                            connectionId={focusProfileId} 
-                            profileData={parentProfileData || null} 
-                            isLoading={isParentLoading}
-                            error={parentError}
-                            prospectCount={prospectsInGroup.length}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3 py-2 px-4 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-500">Unknown connection source or data not available</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Display prospects within this group */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
-                    {prospectsInGroup.map((prospect, prospectIndex) => (
-                      <div
-                        key={`prospect-${prospect.profile_id}-${prospectIndex}`} 
-                        className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer flex flex-col"
-                        style={{ height: "380px" }}  /* Hauteur fixe pour toutes les cartes */
-                        onClick={() => loadProspectDetails(prospect)}
-                      >
-                        {/* Profile header with image */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex items-center">
-                          <div className="h-16 w-16 flex-shrink-0">
-                            {prospect.profile_image_url ? (
-                              <img 
-                                src={prospect.profile_image_url} 
-                                alt={prospect.name}
-                                className="h-16 w-16 rounded-full object-cover border-2 border-white shadow-sm"
-                              />
-                            ) : (
-                              <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-300 to-indigo-300 flex items-center justify-center border-2 border-white shadow-sm">
-                                <span className="text-white font-medium text-xl">
-                                  {prospect.name?.charAt(0) || ''}
-                                </span>
+                    {/* Display prospects within this group */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
+                      {prospectsInGroup.map((prospect, prospectIndex) => (
+                        <div
+                          key={`prospect-${prospect.profile_id}-${prospectIndex}`} 
+                          className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer flex flex-col"
+                          style={{ height: "380px" }}  /* Hauteur fixe pour toutes les cartes */
+                          onClick={() => loadProspectDetails(prospect)}
+                        >
+                          {/* Profile header with image */}
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex items-center">
+                            <div className="h-16 w-16 flex-shrink-0">
+                              {prospect.profile_image_url ? (
+                                <img 
+                                  src={prospect.profile_image_url} 
+                                  alt={prospect.name}
+                                  className="h-16 w-16 rounded-full object-cover border-2 border-white shadow-sm"
+                                />
+                              ) : (
+                                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-300 to-indigo-300 flex items-center justify-center border-2 border-white shadow-sm">
+                                  <span className="text-white font-medium text-xl">
+                                    {prospect.name?.charAt(0) || ''}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-4">
+                              <h4 className="text-lg font-medium text-gray-900 line-clamp-1">
+                                {prospect.name}
+                              </h4>
+                              <p className="text-sm font-medium text-blue-600 line-clamp-1">
+                                {prospect.title}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Profile details - using flex-grow to fill available space */}
+                          <div className="p-4 flex-grow overflow-y-auto">
+                            <div className="mb-2">
+                              <p className="text-sm text-gray-600 font-medium">Position</p>
+                              <p className="text-sm text-gray-900 line-clamp-2">{prospect.title}</p>
+                            </div>
+                            <div className="mb-2">
+                              <p className="text-sm text-gray-600 font-medium">Location</p>
+                              <p className="text-sm text-gray-900">{prospect.location}</p>
+                            </div>
+                            
+                            {/* Similarity scores */}
+                            {prospect.overall_similarity !== undefined && (
+                              <div className="mb-4 mt-3 border-t border-gray-100 pt-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-xs text-gray-600 font-medium">Similarity Score:</p>
+                                  <p className="text-xs font-bold text-blue-600">{Math.round(prospect.overall_similarity * 100)}%</p>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-blue-600 h-1.5 rounded-full" 
+                                    style={{ width: `${Math.round(prospect.overall_similarity * 100)}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Shared entities */}
+                            {(prospect.shared_companies?.length || prospect.shared_schools?.length) && (
+                              <div className="mb-3 text-xs">
+                                {prospect.shared_companies && prospect.shared_companies.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="text-gray-600 font-medium mb-1">Shared Companies ({prospect.nbr_shared_companies}):</p>
+                                    <div className="flex flex-wrap">
+                                      {prospect.shared_companies.map((company, idx) => (
+                                        <span 
+                                          key={`company-${idx}`}
+                                          className="bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 text-xs mb-1 mr-1"
+                                        >
+                                          {typeof company === 'string' ? company : company.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {prospect.shared_schools && prospect.shared_schools.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="text-gray-600 font-medium mb-1">Shared Schools ({prospect.nbr_shared_schools}):</p>
+                                    <div className="flex flex-wrap">
+                                      {prospect.shared_schools.map((school, idx) => (
+                                        <span 
+                                          key={`school-${idx}`}
+                                          className="bg-green-50 text-green-700 rounded-full px-2 py-0.5 text-xs mb-1 mr-1"
+                                        >
+                                          {typeof school === 'string' ? school : school.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                          <div className="ml-4">
-                            <h4 className="text-lg font-medium text-gray-900 line-clamp-1">
-                              {prospect.name}
-                            </h4>
-                            <p className="text-sm font-medium text-blue-600 line-clamp-1">
-                              {prospect.title}
-                            </p>
+                            
+                          {/* Actions - maintenant dans un div fixe au bas de la carte */}
+                          <div className="p-4 border-t border-gray-100 mt-auto">
+                            <div className="flex justify-between items-center">
+                              {prospect.profile_url && (
+                                <a 
+                                  href={prospect.profile_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-900 text-sm font-medium flex items-center"
+                                  onClick={(e) => e.stopPropagation()} /* Empêche l'ouverture du dialog quand on clique sur le lien */
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                                  </svg>
+                                  Profile
+                                </a>
+                              )}
+                              <button 
+                                className="text-green-600 hover:text-green-900 text-sm font-medium flex items-center"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Empêche l'ouverture du dialog quand on clique sur le bouton
+                                  // Logique pour les intros ici
+                                }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                                Intros
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Profile details - using flex-grow to fill available space */}
-                        <div className="p-4 flex-grow overflow-y-auto">
-                          <div className="mb-2">
-                            <p className="text-sm text-gray-600 font-medium">Position</p>
-                            <p className="text-sm text-gray-900 line-clamp-2">{prospect.title}</p>
-                          </div>
-                          <div className="mb-2">
-                            <p className="text-sm text-gray-600 font-medium">Location</p>
-                            <p className="text-sm text-gray-900">{prospect.location}</p>
-                          </div>
-                          
-                          {/* Similarity scores */}
-                          {prospect.overall_similarity !== undefined && (
-                            <div className="mb-4 mt-3 border-t border-gray-100 pt-3">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className="text-xs text-gray-600 font-medium">Similarity Score:</p>
-                                <p className="text-xs font-bold text-blue-600">{Math.round(prospect.overall_similarity * 100)}%</p>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              // Vue en liste (nouvelle)
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prospect
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Poste
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Localisation
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Score de similarité
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Entreprises partagées
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Écoles partagées
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Connection via
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {prospects.map((prospect, index) => {
+                      const parentProfileData = parentProfileResumes[prospect.focus_profile_id];
+                      
+                      return (
+                        <tr 
+                          key={`prospect-list-${prospect.profile_id}-${index}`} 
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => loadProspectDetails(prospect)}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 flex-shrink-0">
+                                {prospect.profile_image_url ? (
+                                  <img 
+                                    src={prospect.profile_image_url} 
+                                    alt={prospect.name}
+                                    className="h-10 w-10 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <span className="text-white font-medium text-sm">
+                                      {prospect.name?.charAt(0) || ''}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{prospect.name}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{prospect.title || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{prospect.location || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                                 <div 
-                                  className="bg-blue-600 h-1.5 rounded-full" 
-                                  style={{ width: `${Math.round(prospect.overall_similarity * 100)}%` }}
+                                  className="bg-blue-600 h-2 rounded-full" 
+                                  style={{ width: `${Math.round((prospect.overall_similarity || 0) * 100)}%` }}
                                 ></div>
                               </div>
+                              <span className="text-sm font-medium text-blue-700">
+                                {Math.round((prospect.overall_similarity || 0) * 100)}%
+                              </span>
                             </div>
-                          )}
-                          
-                          {/* Shared entities */}
-                          {(prospect.shared_companies?.length || prospect.shared_schools?.length) && (
-                            <div className="mb-3 text-xs">
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {prospect.nbr_shared_companies || 0}
                               {prospect.shared_companies && prospect.shared_companies.length > 0 && (
-                                <div className="mb-2">
-                                  <p className="text-gray-600 font-medium mb-1">Shared Companies ({prospect.nbr_shared_companies}):</p>
-                                  <div className="flex flex-wrap">
-                                    {prospect.shared_companies.map((company, idx) => (
-                                      <span 
-                                        key={`company-${idx}`}
-                                        className="bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 text-xs mb-1 mr-1"
-                                      >
-                                        {typeof company === 'string' ? company : company.name}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {prospect.shared_schools && prospect.shared_schools.length > 0 && (
-                                <div className="mb-2">
-                                  <p className="text-gray-600 font-medium mb-1">Shared Schools ({prospect.nbr_shared_schools}):</p>
-                                  <div className="flex flex-wrap">
-                                    {prospect.shared_schools.map((school, idx) => (
-                                      <span 
-                                        key={`school-${idx}`}
-                                        className="bg-green-50 text-green-700 rounded-full px-2 py-0.5 text-xs mb-1 mr-1"
-                                      >
-                                        {typeof school === 'string' ? school : school.name}
-                                      </span>
-                                    ))}
-                                  </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {prospect.shared_companies.slice(0, 2).map((company, idx) => (
+                                    <span key={idx} className="inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-1 mr-1 mb-1">
+                                      {typeof company === 'string' ? company : company.name}
+                                    </span>
+                                  ))}
+                                  {prospect.shared_companies.length > 2 && (
+                                    <span className="text-gray-400">+{prospect.shared_companies.length - 2}</span>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                          
-                        {/* Actions - maintenant dans un div fixe au bas de la carte */}
-                        <div className="p-4 border-t border-gray-100 mt-auto">
-                          <div className="flex justify-between items-center">
-                            {prospect.profile_url && (
-                              <a 
-                                href={prospect.profile_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-900 text-sm font-medium flex items-center"
-                                onClick={(e) => e.stopPropagation()} /* Empêche l'ouverture du dialog quand on clique sur le lien */
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {prospect.nbr_shared_schools || 0}
+                              {prospect.shared_schools && prospect.shared_schools.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {prospect.shared_schools.slice(0, 2).map((school, idx) => (
+                                    <span key={idx} className="inline-block bg-green-100 text-green-800 rounded-full px-2 py-1 mr-1 mb-1">
+                                      {typeof school === 'string' ? school : school.name}
+                                    </span>
+                                  ))}
+                                  {prospect.shared_schools.length > 2 && (
+                                    <span className="text-gray-400">+{prospect.shared_schools.length - 2}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {parentProfileData?.basic_info?.full_name || prospect.focus_profile_id}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {prospect.profile_url && (
+                                <a
+                                  href={prospect.profile_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-900"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  LinkedIn
+                                </a>
+                              )}
+                              <button
+                                className="text-green-600 hover:text-green-900"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Logique pour les intros ici
+                                }}
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                                </svg>
-                                Profile
-                              </a>
-                            )}
-                            <button 
-                              className="text-green-600 hover:text-green-900 text-sm font-medium flex items-center"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Empêche l'ouverture du dialog quand on clique sur le bouton
-                                // Logique pour les intros ici
-                              }}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                              </svg>
-                              Intros
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                                Intros
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

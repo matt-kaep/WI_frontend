@@ -31,7 +31,7 @@ const Toast = ({ message, onClose, type = "info" }: { message: string, onClose: 
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
-    }, 5000);
+    }, 10000);
     return () => clearTimeout(timer);
   }, [onClose]);
 
@@ -495,7 +495,7 @@ const ConnectionsPage: React.FC = () => {
   if (!currentSession) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">Connexions</h1>
+        <h1 className="text-2xl font-bold mb-4">🌐 Top Connexions </h1>
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -552,7 +552,7 @@ const ConnectionsPage: React.FC = () => {
         </div>
       )}
       
-      <h1 className="text-2xl font-bold mb-6">Connexions</h1>
+      <h1 className="text-2xl font-bold mb-6">🌐 Top Connexions</h1>
       
       {/* Contrôles de filtrage */}
       <div className="mb-6 bg-white p-4 shadow rounded-lg">

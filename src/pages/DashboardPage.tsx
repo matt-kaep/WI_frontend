@@ -7,6 +7,7 @@ interface SessionStats {
   connection_count: number;
   profile_count: number;
   prospect_count: number;
+  top_connections_count: number;
   last_activity: string;
   file_name?: string;
 }
@@ -69,6 +70,10 @@ const DashboardPage: React.FC = () => {
           return () => clearTimeout(timeoutId);
         } else {
           console.log(`Statut final atteint: ${statusData.status}, arrêt des vérifications`);
+          // If processing is complete, refresh stats to get updated top connections count
+          if (statusData.status === 'done') {
+            fetchSessionStats();
+          }
         }
       } else {
         console.error("Format de statut invalide reçu:", statusData);
@@ -153,6 +158,7 @@ const DashboardPage: React.FC = () => {
         connection_count: uploadResult.connection_count || 0,
         profile_count: uploadResult.profile_count || 0,
         prospect_count: uploadResult.prospect_count || 0,
+        top_connections_count: 0, // Set to 0 initially, will be updated after processing
         last_activity: new Date().toISOString(),
         file_name: file.name
       });
@@ -195,7 +201,7 @@ const DashboardPage: React.FC = () => {
   if (!currentSession) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">Home Page</h1>
+        <h1 className="text-2xl font-bold mb-4">🏠 Home Page</h1>
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -216,7 +222,7 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Home Page</h1>
+      <h1 className="text-2xl font-bold mb-4">🏠 Home Page</h1>
       
       {/* Message de bienvenue */}
       <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
@@ -356,13 +362,13 @@ const DashboardPage: React.FC = () => {
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Network Statistics</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-sm text-blue-600">Imported Connections</p>
-            <p className="text-2xl font-bold">{stats?.connection_count || currentSession.connection_count || 0}</p>
-          </div>
           <div className="bg-green-50 p-4 rounded-lg">
-            <p className="text-sm text-green-600">Analyzed Profiles</p>
+            <p className="text-sm text-green-600">Imported Profiles</p>
             <p className="text-2xl font-bold">{stats?.profile_count || currentSession.profile_count || 0}</p>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-blue-600">Top connections</p>
+            <p className="text-2xl font-bold">{stats?.top_connections_count || 0}</p>
           </div>
           <div className="bg-purple-50 p-4 rounded-lg">
             <p className="text-sm text-purple-600">Prospects Found</p>
