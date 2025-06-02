@@ -12,6 +12,8 @@ interface ProspectFilter {
   useExperience?: boolean;
   useEducation?: boolean;
   limit?: number;
+  useJobTitleFilter?: boolean;
+  targetedCompanyFilter?: string[];
 }
 
 // Define the ProfileResume interface to match the API response
@@ -356,11 +358,13 @@ const ProspectsPage: React.FC = () => {
   // Filter state
   const [filters, setFilters] = useState<ProspectFilter>({
     selectedConnectionIds: [],
-    locationFilter: "France OR Paris",
-    jobTitleFilter: "Sales OR Marketing",
+    locationFilter: "France, Paris",
+    jobTitleFilter: "Sales, Marketing",
     useExperience: true,
     useEducation: false,
     limit: 150,
+    useJobTitleFilter: true,
+    targetedCompanyFilter: [],
   });
   
   // Show filter form (open by default)
@@ -912,10 +916,20 @@ const ProspectsPage: React.FC = () => {
             </button>
             <button
               onClick={searchProspects}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
-              {isLoading ? 'Searching...' : 'Find Prospects'}
+              {isLoading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Recherche en cours...
+                </div>
+              ) : (
+                'Find Prospects'
+              )}
             </button>
           </div>
         </div>
@@ -1005,6 +1019,23 @@ const ProspectsPage: React.FC = () => {
                   placeholder="50"
                 />
               </div>
+              <div>
+                <label htmlFor="targetedCompanyFilter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Targeted Company
+                </label>
+                <input
+                  type="text"
+                  id="targetedCompanyFilter"
+                  name="targetedCompanyFilter"
+                  value={filters.targetedCompanyFilter?.join(', ') || ''}
+                  onChange={(e) => setFilters(prev => ({
+                    ...prev,
+                    targetedCompanyFilter: e.target.value ? e.target.value.split(', ').map(s => s.trim()) : []
+                  }))}
+                  className="w-full p-2 border border-gray-300 rounded"
+                  placeholder="Target Company"
+                />
+              </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center">
                   <input
@@ -1030,6 +1061,19 @@ const ProspectsPage: React.FC = () => {
                   />
                   <label htmlFor="useEducation" className="ml-2 text-sm text-gray-700">
                     Use Education
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="useJobTitleFilter"
+                    name="useJobTitleFilter"
+                    checked={filters.useJobTitleFilter}
+                    onChange={handleFilterChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <label htmlFor="useJobTitleFilter" className="ml-2 text-sm text-gray-700">
+                    Use Job Title Filter
                   </label>
                 </div>
               </div>
