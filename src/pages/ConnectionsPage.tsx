@@ -527,6 +527,117 @@ const ConnectionsPage: React.FC = () => {
     return `${(value*100).toFixed(0)}%`;
   };
 
+  // Fonction pour exporter les connexions en CSV
+  const exportConnectionsToCSV = (connections: Connection[], filename: string = 'connexions_linkedin.csv') => {
+    console.log(`Exportation de ${connections.length} connexions en CSV`);
+    
+    try {
+      // Définir les en-têtes du CSV
+      const headers = [
+        'Nom',
+        'Titre',
+        'Localisation',
+        'Industrie',
+        'Score Global (%)',
+        'Score Entreprise (%)',
+        'Score Formation (%)',
+        'Score Poste (%)',
+        'Score Nom de famille (%)',
+        'Nombre Entreprises Communes',
+        'Nombre Écoles Communes',
+        'Entreprises Communes',
+        'Écoles Communes',
+        'URL LinkedIn',
+        'Favori'
+      ];
+      
+      // Convertir les données en format CSV
+      const csvData = connections.map(connection => [
+        connection.target_name || connection.name || '',
+        connection.title || '',
+        connection.location || '',
+        connection.industry || '',
+        (connection.overall_similarity * 100).toFixed(1),
+        (connection.company_similarity * 100).toFixed(1),
+        (connection.education_similarity * 100).toFixed(1),
+        (connection.job_title_similarity * 100).toFixed(1),
+        (connection.family_name_similarity * 100).toFixed(1),
+        connection.nbr_shared_companies || 0,
+        connection.nbr_shared_schools || 0,
+        connection.shared_companies?.map(c => c.name).join('; ') || '',
+        connection.shared_schools?.map(s => s.name).join('; ') || '',
+        connection.profile_url || '',
+        connection.is_favorite ? 'Oui' : 'Non'
+      ]);
+      
+      // Construire le contenu CSV
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(field => {
+          // Échapper les guillemets et encapsuler les champs avec des virgules ou des guillemets
+          const stringField = String(field);
+          if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+            return `"${stringField.replace(/"/g, '""')}"`;
+          }
+          return stringField;
+        }).join(','))
+      ].join('\n');
+      
+      // Créer et télécharger le fichier
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log('Export CSV réussi');
+      
+      // Afficher un message de succès
+      setToast({
+        message: `${connections.length} connexion${connections.length > 1 ? 's' : ''} exportée${connections.length > 1 ? 's' : ''} avec succès`,
+        type: "success"
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l\'export CSV:', error);
+      setToast({
+        message: 'Erreur lors de l\'export CSV',
+        type: "error"
+      });
+      return false;
+    }
+  };
+
+  // Fonction pour gérer l'export avec gestion des différents types de données
+  const handleExport = () => {
+    if (!connections || connections.length === 0) {
+      setToast({
+        message: 'Aucune connexion à exporter',
+        type: "warning"
+      });
+      return;
+    }
+
+    const dataToExport = filteredConnections.length > 0 ? filteredConnections : connections;
+    const currentDate = new Date().toISOString().split('T')[0];
+    let filename = `connexions_linkedin_${currentDate}.csv`;
+    
+    // Personnaliser le nom de fichier selon le contexte
+    if (showOnlyFavorites) {
+      filename = `connexions_favorites_${currentDate}.csv`;
+    } else if (searchQuery.trim()) {
+      filename = `connexions_recherche_${currentDate}.csv`;
+    }
+    
+    exportConnectionsToCSV(dataToExport, filename);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Toast notification */}
@@ -568,7 +679,30 @@ const ConnectionsPage: React.FC = () => {
           )}
           
           {/* Boutons d'action */}
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Bouton d'export */}
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              disabled={!connections || connections.length === 0}
+              title={`Exporter ${showOnlyFavorites ? 'les connexions favorites' : filteredConnections.length > 0 && searchQuery ? 'les résultats de recherche' : 'toutes les connexions'} en CSV`}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Exporter
+              {filteredConnections.length !== connections.length && searchQuery && (
+                <span className="ml-1 text-xs bg-emerald-500 px-1.5 py-0.5 rounded-full">
+                  {filteredConnections.length}
+                </span>
+              )}
+              {showOnlyFavorites && (
+                <span className="ml-1 text-xs bg-emerald-500 px-1.5 py-0.5 rounded-full">
+                  Favoris
+                </span>
+              )}
+            </button>
+            
             {/* Bouton pour ajouter une connexion manuellement */}
             <button
               onClick={() => setIsAddConnectionModalOpen(true)}
